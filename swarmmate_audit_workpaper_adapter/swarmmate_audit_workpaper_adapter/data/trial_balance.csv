@@ -1,0 +1,11 @@
+account,description,fiscal_2025,fiscal_2024
+1000,Cash,1850000,1725000
+1100,Accounts Receivable,2480000,2315000
+1200,Inventory,3950000,3610000
+1500,Prepaids,220000,198000
+2000,Accounts Payable,1640000,1515000
+2300,Accrued Liabilities,980000,905000
+3100,Revenue,12850000,11800000
+4100,Cost of Goods Sold,8440000,7960000
+5100,Operating Expenses,2310000,2265000
+5990,Manual Journal Entry Reserve,185000,20000

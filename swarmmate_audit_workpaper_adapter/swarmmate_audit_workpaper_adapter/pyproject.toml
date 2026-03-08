@@ -1,0 +1,22 @@
+[project]
+name = "swarmmate-audit-workpaper-adapter"
+version = "0.1.0"
+description = "Workflow adapter for pre-CCH audit and tax workpapers built with LangGraph"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.2.16",
+    "langchain-openai>=1.1.10",
+    "langchain-qdrant>=1.1.0",
+    "langchain-text-splitters>=1.1.1",
+    "langgraph>=1.0.10",
+    "langgraph-cli[inmem]>=0.4.12",
+    "langgraph-sdk>=0.3.9",
+    "langsmith>=0.7.9",
+    "openpyxl>=3.1.5",
+    "pymupdf>=1.27.1",
+    "python-dotenv>=1.2.2",
+    "qdrant-client>=1.17.0",
+    "tiktoken>=0.12.0",
+]

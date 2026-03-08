@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "dependencies": ["."],
+  "env": ".env",
+  "python_version": "3.13",
+  "graphs": {
+    "workpaper_assistant": "app.graphs.workpaper_assistant:graph",
+    "workpaper_adapter_with_guardrails": "app.graphs.workpaper_adapter_with_guardrails:graph"
+  },
+  "assistants": {
+    "assistant": {
+      "graph_id": "workpaper_assistant",
+      "name": "SwarmMate Audit Workpaper Assistant",
+      "description": "Turns uploaded workpapers into grounded summaries, memos, checklists, and client-ready drafts."
+    },
+    "assistant_guarded": {
+      "graph_id": "workpaper_adapter_with_guardrails",
+      "name": "SwarmMate Audit Workflow Adapter (Guarded)",
+      "description": "Same workflow adapter with an explicit grounding and output-quality gate before completion."
+    }
+  }
+}

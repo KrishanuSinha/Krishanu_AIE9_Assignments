@@ -1,0 +1,26 @@
+# Core LangGraph / LangChain stack
+langgraph>=1.0.10
+langgraph-cli[inmem]>=0.4.12
+langgraph-sdk>=0.3.9
+langchain-core>=1.2.16
+langchain-community>=0.4.1
+langchain-openai>=1.1.10
+langchain-qdrant>=1.1.0
+langchain-text-splitters>=1.1.1
+
+# Vector store / tokenization
+qdrant-client>=1.17.0
+tiktoken>=0.12.0
+
+# Document ingestion
+openpyxl>=3.1.5
+pymupdf>=1.27.1
+
+# Config / tracing
+python-dotenv>=1.2.2
+langsmith>=0.7.9
+
+# Explicit direct import used in app/models.py and app/state.py transitively,
+# added here to make pip installs more predictable outside uv/pyproject.
+pydantic>=2.7.0
+gradio
