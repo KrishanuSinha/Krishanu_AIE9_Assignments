@@ -101,6 +101,19 @@ Use RAGAS to evaluate your open-source Fireworks AI powered RAG app against an O
 
 Additionally, instrument both pipelines with **LangSmith** to capture token usage and cost per query. Use LangSmith's tracing and cost dashboards to compare the total cost of running each provider at scale. Include your evaluation results, cost breakdown, and analysis in your Loom video.
 
+## Answer:
+
+For Fireworks, I got:
+##### Context Precision = 1.0
+##### Factual Correctness = 0.555
+##### Mean total tokens = 2865
+For OpenAI, I got:
+##### Context Precision = 1.0
+##### Factual Correctness = 0.530
+##### Mean total tokens = 2771
+
+So the main takeaway is that both providers retrieved the correct context very well, since both scored a perfect 1.0 on context precision. On answer quality, Fireworks performed slightly better in this run, with 0.555 factual correctness versus 0.530 for OpenAI. On token usage, Fireworks used slightly more tokens on average.
+
 ## Advanced Activity: Local Models
 
 Swap out the Fireworks AI endpoints for **locally-running open-source models** using [Ollama](https://ollama.com/) or another local inference server of your choice. Run both your embedding model and your chat model locally, and rebuild the RAG pipeline on top of them.
