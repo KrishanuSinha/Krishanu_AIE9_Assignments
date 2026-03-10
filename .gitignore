@@ -5,3 +5,7 @@ content/
 # Ignore large/generated local files
 swarmmate_audit_workpaper_adapter/swarmmate_audit_workpaper_adapter/SwarmMate.mp4
 15_LangGraph_Deployments/.langgraph_api/
+
+# Ignore large/generated local files
+swarmmate_audit_workpaper_adapter/swarmmate_audit_workpaper_adapter/SwarmMate.mp4
+15_LangGraph_Deployments/.langgraph_api/
