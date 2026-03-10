@@ -83,7 +83,8 @@ What is the difference between serverless and dedicated endpoints?
 
 #### ✅ Answer:
 
-_(insert your answer here)_
+Serverless endpoints run on shared infrastructure and are the fastest way to get started, so they are great for experimentation and lighter workloads. Dedicated endpoints (called on-demand deployments in Fireworks) use dedicated GPU resources for your deployment, which gives you lower latency, higher throughput, more predictable performance, no account-level hard rate limits, and often better economics at higher sustained usage. Fireworks also notes that serverless is billed per token, while on-demand deployments are billed by GPU-second. 
+
 
 ### ❓ Question #2:
 
@@ -91,7 +92,8 @@ Why is it important to consider token throughput and latency when choosing an LL
 
 #### ✅ Answer:
 
-_(insert your answer here)_
+It is important because latency affects how quickly users see a response, while token throughput affects how fast the model can generate output and how much traffic your application can handle at once. In practice, a model with high latency or low throughput can make the app feel slow, create bottlenecks during peak usage, and increase the chance of 429 errors or capacity issues. Fireworks explicitly states that dedicated deployments provide lower latency and higher throughput than serverless, and its docs explain that serverless 429s come from rate limits while dedicated 429s indicate saturated deployment capacity. 
+
 
 ## Activity 1: RAGAS Evaluation with Cost Analysis
 

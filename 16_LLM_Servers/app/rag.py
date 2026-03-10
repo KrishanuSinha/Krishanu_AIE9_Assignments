@@ -1,12 +1,4 @@
-"""Retrieval-Augmented Generation (RAG) utilities and tool.
-
-This module builds an in-memory RAG pipeline that:
-- Loads PDF documents from `RAG_DATA_DIR` (default: "data").
-- Splits documents into chunks using a token-aware splitter.
-- Embeds chunks with OpenAI and stores vectors in an in-memory Qdrant store.
-- Exposes a LangChain Tool `retrieve_information` that retrieves relevant
-  context and generates a response constrained to that context.
-"""
+"""Provider-aware RAG helpers for the Assignment 16 cat-health application."""
 
 from __future__ import annotations
 
@@ -14,120 +6,144 @@ import os
 from functools import lru_cache
 from typing import Annotated, TypedDict
 
+import langsmith as ls
 import tiktoken
 from langchain_community.document_loaders import DirectoryLoader, PyMuPDFLoader
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
-from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
-from langgraph.graph import START, StateGraph
+
+from app.models import Provider, get_chat_model, get_embedding_model
 
 
 def _tiktoken_len(text: str) -> int:
-    """Return token length using tiktoken; used for chunk length measurement."""
     tokens = tiktoken.encoding_for_model("gpt-4o").encode(text)
     return len(tokens)
 
 
-class _RAGState(TypedDict):
-    """State schema for the simple two-step RAG graph: retrieve then generate."""
-
+class RAGRunResult(TypedDict):
+    provider: str
     question: str
-    context: list[Document]
-    response: str
-
-
-def _build_rag_graph(data_dir: str):
-    """Construct and compile a minimal RAG graph.
-
-    Steps:
-    1) Load PDFs from `data_dir` recursively (best-effort).
-    2) Split documents into token-aware chunks.
-    3) Create embeddings and an in-memory Qdrant vector store retriever.
-    4) Define a chat prompt and generation model.
-    5) Wire a two-node graph: retrieve -> generate.
-    """
-    # Load PDFs from data directory (recursive)
-    try:
-        directory_loader = DirectoryLoader(
-            data_dir, glob="**/*.pdf", loader_cls=PyMuPDFLoader
-        )
-        documents = directory_loader.load()
-    except Exception:
-        documents = []
-
-    # Split documents
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=750, chunk_overlap=0, length_function=_tiktoken_len
-    )
-    chunks = text_splitter.split_documents(documents) if documents else []
-
-    # Embeddings and vector store (in-memory Qdrant)
-    embedding_model = OpenAIEmbeddings(
-        model=os.environ.get("FIREWORKS_EMBEDDING_MODEL", "accounts/fireworks/models/qwen3-embedding-8b"),
-        openai_api_key=os.environ["FIREWORKS_API_KEY"],
-        openai_api_base="https://api.fireworks.ai/inference/v1",
-        check_embedding_ctx_length=False,
-        dimensions=4096,
-    )
-    qdrant_vectorstore = QdrantVectorStore.from_documents(
-        documents=chunks,
-        embedding=embedding_model,
-        location=":memory:",
-        collection_name="rag_collection",
-    )
-    retriever = qdrant_vectorstore.as_retriever()
-
-    # Prompt and model
-    human_template = (
-        "\n#CONTEXT:\n{context}\n\nQUERY:\n{query}\n\n"
-        "Use the provide context to answer the provided user query. "
-        "Only use the provided context to answer the query. If you do not know the answer, or it's not contained in the provided context respond with \"I don't know\""
-    )
-    chat_prompt = ChatPromptTemplate.from_messages([("human", human_template)])
-    generator_llm = ChatOpenAI(
-        model=os.environ.get("FIREWORKS_CHAT_MODEL", "accounts/fireworks/models/gpt-oss-20b"),
-        openai_api_key=os.environ["FIREWORKS_API_KEY"],
-        openai_api_base="https://api.fireworks.ai/inference/v1",
-    )
-
-    def retrieve(state: _RAGState) -> _RAGState:
-        retrieved_docs = retriever.invoke(state["question"]) if retriever else []
-        return {"context": retrieved_docs}  # type: ignore
-
-    def generate(state: _RAGState) -> _RAGState:
-        generator_chain = chat_prompt | generator_llm | StrOutputParser()
-        response_text = generator_chain.invoke(
-            {"query": state["question"], "context": state.get("context", [])}
-        )
-        return {"response": response_text}  # type: ignore
-
-    graph_builder = StateGraph(_RAGState)
-    graph_builder = graph_builder.add_sequence([retrieve, generate])
-    graph_builder.add_edge(START, "retrieve")
-    return graph_builder.compile()
+    answer: str
+    retrieved_contexts: list[str]
+    source_documents: list[dict[str, str | int | None]]
+    usage_metadata: dict
 
 
 @lru_cache(maxsize=1)
-def _get_rag_graph():
-    """Return a cached compiled RAG graph built from RAG_DATA_DIR."""
+def _get_source_documents() -> tuple[Document, ...]:
     data_dir = os.environ.get("RAG_DATA_DIR", "data")
-    return _build_rag_graph(data_dir)
+    if not os.path.isdir(data_dir):
+        raise FileNotFoundError(f"RAG data directory not found: {data_dir}")
+
+    loader = DirectoryLoader(
+        data_dir,
+        glob="**/*.pdf",
+        loader_cls=PyMuPDFLoader,
+    )
+    documents = loader.load()
+    if not documents:
+        raise RuntimeError(f"No PDF documents found under: {data_dir}")
+    return tuple(documents)
+
+
+@lru_cache(maxsize=1)
+def _get_chunks() -> tuple[Document, ...]:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=750,
+        chunk_overlap=100,
+        length_function=_tiktoken_len,
+    )
+    return tuple(splitter.split_documents(list(_get_source_documents())))
+
+
+@lru_cache(maxsize=2)
+def _get_vectorstore(provider: Provider) -> QdrantVectorStore:
+    return QdrantVectorStore.from_documents(
+        documents=list(_get_chunks()),
+        embedding=get_embedding_model(provider=provider),
+        location=":memory:",
+        collection_name=f"rag_collection_{provider}",
+    )
+
+
+def warm_rag_indexes() -> None:
+    """Build both vector indexes outside tracing so setup cost is not mixed with query cost."""
+    _get_vectorstore("fireworks")
+    if os.environ.get("OPENAI_API_KEY"):
+        _get_vectorstore("openai")
+
+
+def _get_usage_metadata(message: AIMessage) -> dict:
+    if getattr(message, "usage_metadata", None):
+        return dict(message.usage_metadata)
+
+    response_metadata = getattr(message, "response_metadata", {}) or {}
+    token_usage = response_metadata.get("token_usage") or response_metadata.get("usage")
+    return dict(token_usage or {})
+
+
+def _serialize_sources(docs: list[Document]) -> list[dict[str, str | int | None]]:
+    payload: list[dict[str, str | int | None]] = []
+    for doc in docs:
+        payload.append(
+            {
+                "source": doc.metadata.get("source"),
+                "page": doc.metadata.get("page"),
+                "chunk_preview": doc.page_content[:180],
+            }
+        )
+    return payload
+
+
+PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are a veterinary RAG assistant. Answer only from the supplied context. "
+            'If the context does not contain the answer, say "I don\'t know based on the document."',
+        ),
+        (
+            "human",
+            "QUESTION:\n{question}\n\nCONTEXT:\n{context}",
+        ),
+    ]
+)
+
+
+@ls.traceable(run_type="chain", name="rag_app_query")
+def answer_question(question: str, provider: Provider = "fireworks") -> RAGRunResult:
+    retriever = _get_vectorstore(provider).as_retriever(
+        search_kwargs={"k": int(os.environ.get("RAG_TOP_K", "4"))}
+    )
+    retrieved_docs = retriever.invoke(question)
+    context_text = "\n\n".join(doc.page_content for doc in retrieved_docs)
+
+    llm = get_chat_model(provider=provider, temperature=0)
+    ai_msg = (PROMPT | llm).invoke(
+        {
+            "question": question,
+            "context": context_text,
+        }
+    )
+
+    return {
+        "provider": provider,
+        "question": question,
+        "answer": ai_msg.content if isinstance(ai_msg.content, str) else str(ai_msg.content),
+        "retrieved_contexts": [doc.page_content for doc in retrieved_docs],
+        "source_documents": _serialize_sources(retrieved_docs),
+        "usage_metadata": _get_usage_metadata(ai_msg),
+    }
 
 
 @tool
 def retrieve_information(
     query: Annotated[str, "query to ask the retrieve information tool"],
-):
-    """Use Retrieval Augmented Generation to retrieve information about feline health, including life stage care, nutrition, vaccinations, parasite control, behavior, diagnostics, and veterinary guidelines for cats."""
-    graph = _get_rag_graph()
-    result = graph.invoke({"question": query})
-    # Prefer returning the response string if available
-    if isinstance(result, dict) and "response" in result:
-        return result["response"]
-    return result
+) -> str:
+    """Use RAG over the feline care guideline PDF."""
+    return answer_question(query, provider="fireworks")["answer"]
