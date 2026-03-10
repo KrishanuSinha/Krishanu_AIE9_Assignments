@@ -89,8 +89,13 @@ The most important fields are dependencies, env, python_version, and graphs. The
 Create your own agent graph! Build a new graph in `app/graphs/` with a custom evaluation node (e.g., a vibe checker, a fact verifier, a summarizer — get creative!). Register it in `langgraph.json`, serve it with `uv run langgraph dev`
 
 ##### Answer:
+I added agent_with_vibe_check agent in the following path: app\graphs\agent_with_vibe_check.py that does the following:
 
-
+Approve the answer only if it is all of the following:\n"
+  "1. Warm and natural in tone\n"
+  "2. Clear and easy to follow\n"
+  "3. Actionable, with a concrete next step when helpful\n"
+  "4. Not robotic or unnecessarily wordy\n\n"
 
 # Ship 🚢
 
