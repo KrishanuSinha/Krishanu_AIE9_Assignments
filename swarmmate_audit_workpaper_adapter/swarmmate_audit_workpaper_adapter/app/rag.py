@@ -118,7 +118,22 @@ def search_workpapers(query: str, *, k: int = 4) -> list[Document]:
     if store is None:
         return []
 
-    retriever = store.as_retriever(search_kwargs={"k": k})
+    retrieval_mode = _get_retrieval_mode()
+
+    if retrieval_mode == "mmr":
+        retriever = store.as_retriever(
+            search_type="mmr",
+            search_kwargs={
+                "k": k,
+                "fetch_k": _get_mmr_fetch_k(k),
+                "lambda_mult": _get_mmr_lambda(),
+            },
+        )
+    else:
+        retriever = store.as_retriever(
+            search_kwargs={"k": k}
+        )
+
     return retriever.invoke(query)
 
 
@@ -156,6 +171,16 @@ def collect_workpaper_evidence(queries: list[str], *, k: int = 4) -> list[dict[s
 
     return results
 
+def describe_retrieval_config() -> str:
+    mode = _get_retrieval_mode()
+    if mode == "mmr":
+        return (
+            f"Retrieval mode: MMR\n"
+            f"MMR fetch_k: {os.environ.get('RAG_MMR_FETCH_K', 'auto')}\n"
+            f"MMR lambda: {os.environ.get('RAG_MMR_LAMBDA', '0.35')}"
+        )
+    return "Retrieval mode: similarity"
+
 
 def describe_indexed_sources() -> str:
     data_dir = os.environ.get("RAG_DATA_DIR", "data")
@@ -168,6 +193,18 @@ def describe_indexed_sources() -> str:
         return "No source files found."
 
     return "Indexed source files:\n- " + "\n- ".join(files)
+
+def _get_retrieval_mode() -> str:
+    return os.environ.get("RAG_RETRIEVAL_MODE", "similarity").strip().lower()
+
+
+def _get_mmr_fetch_k(k: int) -> int:
+    return int(os.environ.get("RAG_MMR_FETCH_K", str(max(k * 3, 12))))
+
+
+def _get_mmr_lambda() -> float:
+    return float(os.environ.get("RAG_MMR_LAMBDA", "0.35"))
+
 
 
 @tool
