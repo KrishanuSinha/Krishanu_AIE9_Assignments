@@ -11,8 +11,18 @@ from a2a.types import (
 )
 
 from agent_executor import CatShopAgentExecutor
-
+import os
+from pathlib import Path
+import uvicorn
+import dotenv
+import dotenv
 dotenv.load_dotenv()
+
+print("OPENAI_API_KEY loaded:", bool(os.getenv("OPENAI_API_KEY")))
+dotenv.load_dotenv()
+
+import os
+print("OPENAI_API_KEY loaded:", bool(os.getenv("OPENAI_API_KEY")))
 
 HOST = "0.0.0.0"
 PORT = 9999
